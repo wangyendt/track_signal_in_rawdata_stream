@@ -103,19 +103,19 @@ if __name__ == '__main__':
     files = os.listdir(path)
     for f in files:
         if '.txt' in f:
-            data = np.genfromtxt(path)
+            data = np.genfromtxt(os.path.join(path, f))
             alpha = 3
             beta = 5
-            upper = 10
-            lower = -10
+            upper = 100
+            lower = -100
             step_u = 0
             step_l = 0
             bef = 50
             aft = 50
             avg = 10
             data = preprocess(data)
-            data = calc_moving_avg(data, 15)
-            energy = calc_energy(data, alpha, gamma)
+            data = calc_moving_avg(data, 3)
+            energy = calc_energy(data, alpha, beta)
             flag = calc_flag(energy, [upper, lower], [step_u, step_l])
             down_array = np.where(np.diff(flag) == 1)
             up_array = np.where(np.diff(flag) == -1)
