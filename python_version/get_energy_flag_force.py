@@ -3,6 +3,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 import sys
 
 
@@ -20,11 +21,11 @@ class CalcEnergy:
         for ii in range(m - self.alpha - self.beta):
             energy_n[ii + self.alpha + self.beta] = 1 / self.alpha * np.sum(
                 np.sum(np.abs(data[ii + self.beta:ii + self.beta + self.alpha, :] - data[ii:ii + self.alpha, :]), 1), 0)
-            diff_mat = data[ii + self.beta:ii + self.beta + self.alpha, :] - data[ii:ii + self.alpha, :]
-            diff_mat_max_sub = np.array(np.where(np.abs(diff_mat) == np.max(np.abs(diff_mat))))
-            diff_mat_max_sub = diff_mat_max_sub[:, 0]
-            max_sign = np.sign(diff_mat[diff_mat_max_sub[0], diff_mat_max_sub[1]])
-            energy_n[ii + self.alpha + self.beta] *= max_sign
+            # diff_mat = data[ii + self.beta:ii + self.beta + self.alpha, :] - data[ii:ii + self.alpha, :]
+            # diff_mat_max_sub = np.array(np.where(np.abs(diff_mat) == np.max(np.abs(diff_mat))))
+            # diff_mat_max_sub = diff_mat_max_sub[:, 0]
+            # max_sign = np.sign(diff_mat[diff_mat_max_sub[0], diff_mat_max_sub[1]])
+            # energy_n[ii + self.alpha + self.beta] *= max_sign
         return energy_n.T[0]
 
 
@@ -32,7 +33,7 @@ def preprocess(data):
     if np.ndim(data) == 1:
         data = data - data[0]
     else:
-        data = data - data[1, :]
+        data = data - data[0, :]
     return data
 
 
@@ -40,9 +41,9 @@ def calc_moving_avg(data, winlen):
     output = []
     for ii in range(len(data)):
         if ii <= winlen:
-            output.append(np.mean(data[:ii + 1]))
+            output.append(np.mean(data[:ii + 1, :], 0))
         else:
-            output.append(np.mean(data[ii - (winlen - 1):ii + 1]))
+            output.append(np.mean(data[ii - (winlen - 1):ii + 1, :], 0))
     return np.array(output)
 
 
@@ -52,28 +53,24 @@ def calc_energy(data, alpha, beta):
     return energy
 
 
-def calc_flag(energy, thd, step):
-    flag = np.zeros(energy.shape)
-    for ii in range(flag.shape[0]):
-        if ii > 0:
-            if flag[ii - 1] == 0:
-                if energy[ii] > thd[0]:
-                    flag[ii] = 1
-                    thd[0] = thd[0] + step[0]
-                    continue
-                else:
-                    flag[ii] = 0
-            if flag[ii - 1] == 1:
-                if energy[ii] < thd[1]:
-                    flag[ii] = 0
-                    thd[1] = thd[1] + step[1]
-                    continue
-                else:
-                    flag[ii] = 1
+# t is tvalue < thd
+def update_flag_status(f, r, t):
+    f = f ^ r and f or not (f ^ r) and not (f ^ t)
+    r = not r and f and t or r and not (not f and t)
+    return f, r
+
+
+def calc_flag(energy, thd):
+    flag = np.zeros(energy.shape, dtype=np.bool)
+    ready = False
+    for ii in range(1, flag.shape[0]):
+        f = bool(flag[ii - 1])
+        t = (not f and (energy[ii] < thd)) or (f and (energy[ii] < thd * 0.9))
+        flag[ii], ready = update_flag_status(f, ready, t)
     return flag
 
 
-def show_fig(data, energy, flag, params):
+def show_fig(data, energy, flag, params,f):
     fig = plt.figure()
     fig.set_size_inches(60, 10)
     plt.plot(data, '-', linewidth=3)
@@ -81,6 +78,7 @@ def show_fig(data, energy, flag, params):
     plt.hlines(params[0], 0, data.shape[0], linestyles='--')
     plt.hlines(params[1], 0, data.shape[0], linestyles='--')
     plt.plot(flag * (np.max(data) - np.min(data)) + np.min(data), '--')
+    plt.title(f)
     plt.legend(['rawdata1', 'rawdata2', 'energy', 'upper limit', 'lower limit', 'touch flag'])
     plt.show()
 
@@ -99,15 +97,16 @@ def calc_force(data_, flag_, bfm_len, aft_len, avg_len, force):
 
 
 if __name__ == '__main__':
-    path = '.'
+    path = 'RawData'
     files = os.listdir(path)
     for f in files:
         if '.txt' in f:
-            data = np.genfromtxt(os.path.join(path, f))
+            data = pd.read_table(os.path.join(path, f), sep=',', header=None)
+            data = np.array(data.ix[:, 16:21])
             alpha = 3
             beta = 5
-            upper = 100
-            lower = -100
+            energy_thd = 100
+            upper = lower = energy_thd
             step_u = 0
             step_l = 0
             bef = 50
@@ -115,9 +114,11 @@ if __name__ == '__main__':
             avg = 10
             data = preprocess(data)
             data = calc_moving_avg(data, 3)
+            # plt.plot(data)
             energy = calc_energy(data, alpha, beta)
-            flag = calc_flag(energy, [upper, lower], [step_u, step_l])
+            flag = np.array(calc_flag(energy, energy_thd), dtype=np.int)
             down_array = np.where(np.diff(flag) == 1)
             up_array = np.where(np.diff(flag) == -1)
-            show_fig(data, energy, flag, [upper, lower])
+            show_fig(data, energy, flag, [upper, lower], f)
             force = calc_force(data, flag, bef, aft, avg, 100)
+            np.savetxt(''.join((f[:-4], '_test.txt')), force, fmt='%8.2f%8.2f%8.2f%8.2f%8.2f%8.2f')
