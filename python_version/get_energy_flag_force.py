@@ -15,6 +15,7 @@ class DataProcessing:
         self.energy = None
         self.flag = None
         self.force = None
+        self.tds = None
         self.mov_avg_len = 5
         self.sigma_wave = 10
         self.sigma_tsunami = 4
@@ -49,6 +50,7 @@ class DataProcessing:
         self.data = np.array(output)
 
     def baseline_removal_single(self, data):
+        # base = peakutils.baseline(data,100)
         base = np.copy(data)
         for ii in range(1, len(data)):
             base[ii] = base[ii - 1] + \
@@ -87,7 +89,7 @@ class DataProcessing:
     @staticmethod
     def update_flag_status(f, r, t, tdf, tuf):
         f_ = f ^ r and f or not (f ^ r) and not (f ^ t)
-        f_ = f_ and tuf if not f else f_ or not tdf
+        f_ = not f and f_ and tuf or f and (f_ or not tdf)
         r_ = not r and f and t or r and not (not f and t)
         return f_, r_
 
@@ -106,25 +108,35 @@ class DataProcessing:
         self.flag = np.array(self.flag, dtype=np.int)
 
     def show_fig(self, f):
+        plt.rcParams['font.family'] = 'YouYuan'
         fig = plt.figure()
         fig.set_size_inches(60, 10)
-        plt.plot(self.force_signal, '-', linewidth=3)
+        plt.subplot(211)
+        plt.plot(self.data)
+        plt.title('rawdata')
+        plt.legend(tuple([''.join(('rawdata', str(ii + 1))) for ii in range(np.shape(self.data)[1])]))
+        plt.ylabel('ADC')
+        plt.subplot(212)
+        # plt.plot(self.force_signal, '-', linewidth=3)
         plt.plot(self.energy)
         plt.hlines(self.upper, 0, self.data.shape[0], linestyles='--')
         plt.hlines(self.lower, 0, self.data.shape[0], linestyles='--')
-        plt.plot(self.flag * (np.max(self.data) - np.min(self.data)) + np.min(self.data), '--')
+        plt.plot(self.flag * (np.max(self.energy) - np.min(self.energy)) + np.min(self.energy), '--')
         plt.title(f)
-        plt.legend(['rawdata1', 'rawdata2', 'energy', 'upper limit', 'lower limit', 'touch flag'])
+        plt.xlabel('Time Series')
+        plt.ylabel('ADC')
+        plt.legend(['energy', 'upper limit', 'lower limit', 'touch flag'])
         plt.show()
 
     def calc_force(self):
-        tds = np.array(np.where(np.diff(self.flag) == 1))[0]
+        self.tds = np.array(np.where(np.diff(self.flag) == 1))[0]
         if np.ndim(self.force_signal) == 1:
             self.force_signal = self.force_signal[:, np.newaxis]
-        params = np.zeros((self.force_signal.shape[1], tds.shape[0]))
+        params = np.zeros((self.force_signal.shape[1], self.tds.shape[0]))
         for ii in range(params.shape[1]):
-            params[:, ii] = np.mean(self.force_signal[tds[ii] + self.aft:tds[ii] + self.aft + self.avg, :], 0) - \
-                            np.mean(self.force_signal[tds[ii] - self.bef - self.avg:tds[ii] - self.bef, :], 0)
+            params[:, ii] = np.mean(self.force_signal[self.tds[ii] + self.aft:self.tds[ii] + self.aft + self.avg, :],
+                                    0) - \
+                            np.mean(self.force_signal[self.tds[ii] - self.bef - self.avg:self.tds[ii] - self.bef, :], 0)
         self.force = params.T
 
 
@@ -144,10 +156,10 @@ if __name__ == '__main__':
                 dp.pre_process()
                 dp.calc_moving_avg()
                 dp.baseline_removal()
-                plt.plot(dp.data)
-                plt.plot(dp.base)
-                plt.plot(dp.data - dp.base)
-                plt.show()
+                # plt.plot(dp.data)
+                # plt.plot(dp.base)
+                # plt.plot(dp.data - dp.base)
+                # plt.show()
                 dp.calc_energy()
                 dp.calc_flag()
                 dp.show_fig(f)
