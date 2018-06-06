@@ -96,7 +96,8 @@ class DataProcessing:
     def calc_flag(self):
         self.flag = np.zeros(self.energy.shape, dtype=np.bool)
         ready = False
-        touch_down_frm = touch_up_frm = 0
+        touch_down_frm = 0
+        touch_up_frm = self.min_tu_time + 1
         for ii in range(1, self.flag.shape[0]):
             f = bool(self.flag[ii - 1])
             t = (not f and (self.energy[ii] < self.energy_thd)) or (f and (self.energy[ii] < self.energy_thd * 0.9))
@@ -114,7 +115,7 @@ class DataProcessing:
         plt.subplot(211)
         plt.plot(self.data)
         plt.title('rawdata')
-        plt.legend(tuple([''.join(('rawdata', str(ii + 1))) for ii in range(np.shape(self.data)[1])]))
+        plt.legend(tuple([''.join(('rawdata', str(ii))) for ii in range(np.shape(self.data)[1])]))
         plt.ylabel('ADC')
         plt.subplot(212)
         # plt.plot(self.force_signal, '-', linewidth=3)
