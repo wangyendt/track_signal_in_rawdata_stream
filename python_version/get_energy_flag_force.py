@@ -16,8 +16,6 @@ class DataProcessing:
         self.flag = None
         self.force = None
         self.tds = None
-        self.limiting_thd = 1000
-        self.limiting_step_ratio = 0.4
         self.mov_avg_len = 5
         self.sigma_wave = 10
         self.sigma_tsunami = 4
@@ -41,18 +39,6 @@ class DataProcessing:
         else:
             self.data = self.data - self.data[0, :]
         self.data = -self.data
-
-    def limiting_filter(self):
-        output = np.zeros(np.shape(self.data))
-        output[0] = self.data[0]
-        for ii in range(len(self.data) - 1):
-            for jj in range(np.shape(self.data)[1]):
-                if np.abs(self.data[ii + 1, jj] - output[ii, jj]) >= self.limiting_thd:
-                    output[ii + 1, jj] = output[ii, jj] + (
-                            self.data[ii + 1, jj] - output[ii, jj]) * self.limiting_step_ratio
-                else:
-                    output[ii + 1, jj] = self.data[ii + 1, jj]
-        self.data = output
 
     def calc_moving_avg(self):
         output = []
@@ -169,7 +155,6 @@ if __name__ == '__main__':
                 data = data[:, 0]
                 dp = DataProcessing(data)
                 dp.pre_process()
-                dp.limiting_filter()
                 dp.calc_moving_avg()
                 dp.baseline_removal()
                 # plt.plot(dp.data)
