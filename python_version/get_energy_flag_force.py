@@ -11,7 +11,7 @@ class DataProcessing:
     def __init__(self, data):
         self.data = data
         self.base = data
-        self.force_signal = data
+        self.force_signal = np.zeros_like(data)
         self.energy = None
         self.flag = None
         self.force = None
