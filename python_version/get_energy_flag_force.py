@@ -114,7 +114,12 @@ class DataProcessing:
         touch_up_frm = self.min_tu_time + 1
         for ii in range(1, self.flag.shape[0]):
             f = bool(self.flag[ii - 1])
-            t = (not f and (self.energy[ii] < self.energy_thd)) or (f and (self.energy[ii] < self.energy_thd * 0.9))
+            t = (not f and (self.energy[ii] < self.energy_thd)) or \
+                (f and (self.energy[ii] <
+                        max(self.energy_thd * 0.9,
+                            max(self.energy[ii - touch_down_frm:ii + 1]) * 0.5
+                            )))
+            # (f and (self.energy[ii] < self.energy_thd * 1.1)) or \
             touch_down_frm = touch_down_frm + 1 if self.flag[ii - 1] else 0
             touch_up_frm = touch_up_frm + 1 if not self.flag[ii - 1] else 0
             tdf = touch_down_frm >= self.min_td_time
