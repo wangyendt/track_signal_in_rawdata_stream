@@ -8,8 +8,9 @@ import sys
 
 
 class DataProcessing:
-    def __init__(self, data):
+    def __init__(self, data, filename):
         self.data = data
+        self.filename = filename
         self.base = data
         self.force_signal = np.zeros_like(data)
         self.energy = None
@@ -24,6 +25,8 @@ class DataProcessing:
         self.alpha = 3
         self.beta = 5
         self.energy_thd = 30
+        self.energy_thd_decay_coef = 0.9
+        self.leave_eng_peak_ratio = 0.5
         self.min_td_time = 50
         self.min_tu_time = 50
         self.upper = self.energy_thd
@@ -116,8 +119,8 @@ class DataProcessing:
             f = bool(self.flag[ii - 1])
             t = (not f and (self.energy[ii] < self.energy_thd)) or \
                 (f and (self.energy[ii] <
-                        max(self.energy_thd * 0.9,
-                            max(self.energy[ii - touch_down_frm:ii + 1]) * 0.5
+                        max(self.energy_thd * self.energy_thd_decay_coef,
+                            max(self.energy[ii - touch_down_frm:ii + 1]) * self.leave_eng_peak_ratio
                             )))
             # (f and (self.energy[ii] < self.energy_thd * 1.1)) or \
             touch_down_frm = touch_down_frm + 1 if self.flag[ii - 1] else 0
@@ -127,7 +130,7 @@ class DataProcessing:
             self.flag[ii], ready = self.update_flag_status(f, ready, t, tdf, tuf)
         self.flag = np.array(self.flag, dtype=np.int)
 
-    def show_fig(self, f):
+    def show_fig(self):
         plt.rcParams['font.family'] = 'YouYuan'
         fig = plt.figure()
         fig.set_size_inches(60, 10)
@@ -142,7 +145,7 @@ class DataProcessing:
         plt.hlines(self.upper, 0, self.data.shape[0], linestyles='--')
         plt.hlines(self.lower, 0, self.data.shape[0], linestyles='--')
         plt.plot(self.flag * (np.max(self.energy) - np.min(self.energy)) + np.min(self.energy), '--')
-        plt.title(f)
+        plt.title(self.filename)
         plt.xlabel('Time Series')
         plt.ylabel('ADC')
         plt.legend(['energy', 'upper limit', 'lower limit', 'touch flag'])
@@ -172,18 +175,14 @@ if __name__ == '__main__':
                 data = np.genfromtxt(os.path.join(path, d, f), delimiter=',')
                 data = data[:, [0, 4]]
                 data = data[:, 0]
-                dp = DataProcessing(data)
+                dp = DataProcessing(data, f)
                 dp.pre_process()
                 dp.limiting_filter()
                 dp.calc_moving_avg()
                 dp.baseline_removal()
-                # plt.plot(dp.data)
-                # plt.plot(dp.base)
-                # plt.plot(dp.data - dp.base)
-                # plt.show()
                 dp.calc_energy()
                 dp.calc_flag()
-                dp.show_fig(f)
+                dp.show_fig()
                 dp.calc_force()
                 force = dp.force
                 np.savetxt(''.join((f[:-4], '_test.txt')), force, fmt='%8.2f')
